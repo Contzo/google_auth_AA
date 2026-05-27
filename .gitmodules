@@ -1,0 +1,9 @@
+[submodule "foundry-AA/lib/forge-std"]
+	path = foundry-AA/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "foundry-AA/lib/openzeppelin-contracts"]
+	path = foundry-AA/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "foundry-AA/lib/account-abstraction"]
+	path = foundry-AA/lib/account-abstraction
+	url = https://github.com/eth-infinitism/account-abstraction
