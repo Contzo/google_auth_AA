@@ -16,7 +16,7 @@ import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 ///         private key. Designed for Google OAuth-based account abstraction flows where
 ///         the backend acts as the authorized transaction signer on behalf of the user.
 /// @dev Implements the IAccount interface required by the ERC-4337 EntryPoint.
-///      Transaction authorization is delegated to `s_UserOperationSigner` — a backend
+///      Transaction authorization is delegated to `sUserOperationSigner` — a backend
 ///      EOA that signs UserOperation hashes off-chain. The EntryPoint is the only entity
 ///      allowed to call `validateUserOp`. Execution is restricted to the EntryPoint or
 ///      the contract owner as an emergency bypass. Gas fees are handled either by a
@@ -83,7 +83,7 @@ contract SCW is IAccount, Ownable {
     /// @notice The backend EOA authorized to sign UserOperations for this wallet.
     /// @dev Mutable to allow key rotation if the backend signing key is compromised.
     ///      Only the contract owner can update this value via `updateUserOperationSigner`.
-    address private s_UserOperationSigner;
+    address private sUserOperationSigner;
 
     /// @notice The only ERC-20 token contract this wallet is permitted to call.
     /// @dev Restricts `execute` to a single token address, limiting the attack surface
@@ -123,7 +123,7 @@ contract SCW is IAccount, Ownable {
             revert SCW__ZeroAddress();
         }
         I_ENTRY_POINT = IEntryPoint(_entryPoint);
-        s_UserOperationSigner = _userOperationSigner;
+        sUserOperationSigner = _userOperationSigner;
         I_ERC20_TOKEN = _erc20Token;
     }
 
@@ -138,7 +138,7 @@ contract SCW is IAccount, Ownable {
     /// @notice Validates an incoming UserOperation and optionally pays the gas prefund.
     /// @dev Called exclusively by the EntryPoint as part of the ERC-4337 validation phase.
     ///      The function performs three sequential checks:
-    ///        1. Signature — verifies the UserOperation was signed by `s_UserOperationSigner`.
+    ///        1. Signature — verifies the UserOperation was signed by `sUserOperationSigner`.
     ///        2. Nonce     — verifies the UserOperation nonce matches the EntryPoint's record.
     ///        3. Prefund   — sends ETH to the EntryPoint if no Paymaster is sponsoring the tx.
     ///      If a Paymaster is set in the UserOperation, `missingAccountFunds` will be 0
@@ -179,14 +179,14 @@ contract SCW is IAccount, Ownable {
 
     /// @notice Rotates the backend signing key authorized to sign UserOperations.
     /// @dev Restricted to the contract owner. Should be called immediately if the current
-    ///      `s_UserOperationSigner` key is suspected to be compromised. The new signer
+    ///      `sUserOperationSigner` key is suspected to be compromised. The new signer
     ///      takes effect for all subsequent UserOperations — previously signed but unsubmitted
     ///      UserOps will fail validation after rotation.
     /// @param _newSigner The new backend EOA address to authorize as the UserOperation signer.
     function updateUserOperationSigner(address _newSigner) external onlyOwner {
         if (_newSigner == address(0)) revert SCW__ZeroAddress();
-        address oldSigner = s_UserOperationSigner;
-        s_UserOperationSigner = _newSigner;
+        address oldSigner = sUserOperationSigner;
+        sUserOperationSigner = _newSigner;
         emit SignerUpdated(oldSigner, _newSigner);
     }
 
@@ -221,7 +221,7 @@ contract SCW is IAccount, Ownable {
     {
         bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(userOpHash);
         address signer = ECDSA.recover(ethSignedMessageHash, userOp.signature);
-        if (signer != s_UserOperationSigner) return SIG_VALIDATION_FAILED;
+        if (signer != sUserOperationSigner) return SIG_VALIDATION_FAILED;
         return SIG_VALIDATION_SUCCESS;
     }
 
@@ -261,7 +261,7 @@ contract SCW is IAccount, Ownable {
 
     /// @notice Returns the current backend EOA authorized to sign UserOperations.
     function getUserOperationSigner() external view returns (address) {
-        return s_UserOperationSigner;
+        return sUserOperationSigner;
     }
 
     /// @notice Returns the ERC-20 token contract this wallet is restricted to calling.
