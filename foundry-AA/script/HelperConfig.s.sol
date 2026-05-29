@@ -8,6 +8,7 @@ struct NetworkConfig {
     address entryPoint;
     address authorizedDeployer;
     address authorizedSigner;
+    uint256 signerKey;
 }
 
 contract HelperConfig is Script {
@@ -20,6 +21,7 @@ contract HelperConfig is Script {
 
     // Fallback defaults — used when env vars are not set
     address constant DEFAULT_ANVIL_WALLET = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+    uint256 constant DEFAULT_ANVIL_SIGNER_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
     /*//////////////////////////////////////////////////////////////
                             State variables
@@ -44,7 +46,8 @@ contract HelperConfig is Script {
         return NetworkConfig({
             entryPoint: vm.envAddress("SEPOLIA_ENTRY_POINT"),
             authorizedDeployer: vm.envOr("SEPOLIA_AUTHORIZED_DEPLOYER", sepoliaWallet),
-            authorizedSigner: vm.envOr("SEPOLIA_AUTHORIZED_SIGNER", sepoliaWallet)
+            authorizedSigner: vm.envOr("SEPOLIA_AUTHORIZED_SIGNER", sepoliaWallet),
+            signerKey: vm.envOr("SEPOLIA_SIGNER_KEY", uint256(0))
         });
     }
 
@@ -59,8 +62,13 @@ contract HelperConfig is Script {
         EntryPoint entryPoint = new EntryPoint();
         vm.stopBroadcast();
 
+        uint256 localSignerKey = vm.envOr("LOCAL_SIGNER_KEY", DEFAULT_ANVIL_SIGNER_KEY);
+
         NetworkConfig memory anvilConfig = NetworkConfig({
-            entryPoint: address(entryPoint), authorizedDeployer: localWallet, authorizedSigner: localWallet
+            entryPoint: address(entryPoint),
+            authorizedDeployer: localWallet,
+            authorizedSigner: localWallet,
+            signerKey: localSignerKey
         });
 
         networkConfigs[LOCAL_CHAIN_ID] = anvilConfig;

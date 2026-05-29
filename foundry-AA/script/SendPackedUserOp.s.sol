@@ -89,7 +89,7 @@ contract SendPackedUserOp is Script {
         bytes32 r;
         bytes32 s;
         // ── 3. Sign the digest ───────────────────
-        (v, r, s) = vm.sign(_config.authorizedSigner, digest);
+        (v, r, s) = vm.sign(_config.signerKey, digest);
         // computte the packed signature
         userOp.signature = abi.encodePacked(r, s, v); // the order of the siganture components is important
 

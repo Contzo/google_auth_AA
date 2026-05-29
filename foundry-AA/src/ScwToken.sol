@@ -10,7 +10,7 @@ contract ScwToken is ERC20, Ownable {
         // rather than minting a fixed supply at deployment.
     }
 
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
 }
