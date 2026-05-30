@@ -157,7 +157,6 @@ contract SCW is IAccount, Ownable {
         returns (uint256 validationData)
     {
         validationData = _validateSignature(userOp, userOpHash);
-        _validateNonce(userOp.nonce);
         _payPrefund(missingAccountFunds);
         return validationData;
     }

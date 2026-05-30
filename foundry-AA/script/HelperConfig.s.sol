@@ -34,7 +34,9 @@ contract HelperConfig is Script {
     //////////////////////////////////////////////////////////////*/
 
     constructor() {
-        networkConfigs[SEPOLIA_CHAIN_ID] = getSepoliaChainConfig();
+        if (block.chainid == SEPOLIA_CHAIN_ID) {
+            networkConfigs[SEPOLIA_CHAIN_ID] = getSepoliaChainConfig();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -47,7 +49,7 @@ contract HelperConfig is Script {
             entryPoint: vm.envAddress("SEPOLIA_ENTRY_POINT"),
             authorizedDeployer: vm.envOr("SEPOLIA_AUTHORIZED_DEPLOYER", sepoliaWallet),
             authorizedSigner: vm.envOr("SEPOLIA_AUTHORIZED_SIGNER", sepoliaWallet),
-            signerKey: uint256(0)
+            signerKey: vm.envUint("SEPOLIA_SIGNER_KEY")
         });
     }
 

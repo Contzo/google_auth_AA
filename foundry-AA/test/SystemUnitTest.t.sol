@@ -258,6 +258,7 @@ contract SystemUnitTest is Test {
 
         address payable recipient = payable(makeAddr("recipient"));
         uint256 withdrawAmount = 0.05 ether;
+        uint256 recipientBalanceBefore = recipient.balance;
 
         // ── Act ──────────────────────────────────
         vm.prank(networkConfig.authorizedDeployer);
@@ -265,7 +266,7 @@ contract SystemUnitTest is Test {
 
         // ── Assert ──────────────────────────────────
         assertEq(sponsorContract.getDeposit(), depositAmount - withdrawAmount);
-        assertEq(recipient.balance, withdrawAmount);
+        assertEq(recipient.balance - recipientBalanceBefore, withdrawAmount);
     }
 
     /// @notice tests the hole EntyrPoint AA flow with the sponsor contract
