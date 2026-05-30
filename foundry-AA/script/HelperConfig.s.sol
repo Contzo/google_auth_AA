@@ -47,7 +47,7 @@ contract HelperConfig is Script {
             entryPoint: vm.envAddress("SEPOLIA_ENTRY_POINT"),
             authorizedDeployer: vm.envOr("SEPOLIA_AUTHORIZED_DEPLOYER", sepoliaWallet),
             authorizedSigner: vm.envOr("SEPOLIA_AUTHORIZED_SIGNER", sepoliaWallet),
-            signerKey: vm.envOr("SEPOLIA_SIGNER_KEY", uint256(0))
+            signerKey: uint256(0)
         });
     }
 

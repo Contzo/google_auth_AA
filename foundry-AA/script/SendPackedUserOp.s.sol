@@ -63,23 +63,16 @@ contract SendPackedUserOp is Script {
         });
     }
 
-    function generateSignedUserOp(bytes memory callData, NetworkConfig memory _config)
-        public
-        view
-        returns (PackedUserOperation memory)
-    {
-        return generateSignedUserOp(_config.authorizedSigner, callData, _config);
-    }
-
-    function generateSignedUserOp(address scwSender, bytes memory callData, NetworkConfig memory _config)
-        public
-        view
-        returns (PackedUserOperation memory)
-    {
+    function generateSignedUserOp(
+        address scwSender,
+        bytes memory callData,
+        NetworkConfig memory _config,
+        address paymaster
+    ) public view returns (PackedUserOperation memory) {
         // ── 1. Generate the unsigned PackedUserOperation data
         uint256 nonce = IEntryPoint(_config.entryPoint).getNonce(scwSender, 0);
 
-        PackedUserOperation memory userOp = _generateUserOp(callData, scwSender, nonce, address(0));
+        PackedUserOperation memory userOp = _generateUserOp(callData, scwSender, nonce, paymaster);
 
         // ── 2. Get the userOpHash from the EntryPoint contract
         bytes32 userOpHash = IEntryPoint(_config.entryPoint).getUserOpHash(userOp);
@@ -89,7 +82,11 @@ contract SendPackedUserOp is Script {
         bytes32 r;
         bytes32 s;
         // ── 3. Sign the digest ───────────────────
-        (v, r, s) = vm.sign(_config.signerKey, digest);
+        if (block.chainid == 31337) {
+            (v, r, s) = vm.sign(_config.signerKey, digest);
+        } else {
+            (v, r, s) = vm.sign(_config.authorizedSigner, digest);
+        }
         // computte the packed signature
         userOp.signature = abi.encodePacked(r, s, v); // the order of the siganture components is important
 

@@ -24,7 +24,8 @@ contract SystemDeployer is Script {
             networkConfig.authorizedDeployer,
             networkConfig.authorizedSigner
         );
-        SponsorContract sponsorContract = new SponsorContract(address(scwFactory));
+        SponsorContract sponsorContract =
+            new SponsorContract(address(scwFactory), networkConfig.authorizedSigner, networkConfig.entryPoint);
         return (scwFactory, scwToken, sponsorContract);
     }
 }

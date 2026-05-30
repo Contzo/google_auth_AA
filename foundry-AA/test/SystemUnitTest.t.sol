@@ -84,7 +84,7 @@ contract SystemUnitTest is Test {
             abi.encodeWithSelector(SCW.execute.selector, address(scwToken), 0, functionDataForMint);
 
         PackedUserOperation memory userOp =
-            sendPackedUserOp.generateSignedUserOp(scwAddress, functionDataForExecute, networkConfig);
+            sendPackedUserOp.generateSignedUserOp(scwAddress, functionDataForExecute, networkConfig, address(0));
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPoint).getUserOpHash(userOp);
 
         // ── Act ──────────────────────────────────
@@ -109,7 +109,8 @@ contract SystemUnitTest is Test {
 
         bytes memory callData = abi.encodeWithSelector(SCW.execute.selector, dest, value, functionData);
 
-        PackedUserOperation memory userOp = sendPackedUserOp.generateSignedUserOp(scwAddress, callData, networkConfig);
+        PackedUserOperation memory userOp =
+            sendPackedUserOp.generateSignedUserOp(scwAddress, callData, networkConfig, address(0));
 
         bytes32 userOpHash = IEntryPoint(networkConfig.entryPoint).getUserOpHash(userOp);
         uint256 missingFunds = 1e18;
@@ -135,7 +136,8 @@ contract SystemUnitTest is Test {
 
         bytes memory functionData = abi.encodeWithSelector(scwToken.mint.selector, scwAddress, AMOUNT);
         bytes memory callData = abi.encodeWithSelector(SCW.execute.selector, dest, value, functionData);
-        PackedUserOperation memory userOp = sendPackedUserOp.generateSignedUserOp(scwAddress, callData, networkConfig);
+        PackedUserOperation memory userOp =
+            sendPackedUserOp.generateSignedUserOp(scwAddress, callData, networkConfig, address(0));
         // Construct the array of usre ops
         PackedUserOperation[] memory userOps = new PackedUserOperation[](1);
         userOps[0] = userOp;
@@ -149,4 +151,59 @@ contract SystemUnitTest is Test {
         // Check that the SCW hasUSDC
         assertEq(scwToken.balanceOf(address(scwAddress)), AMOUNT);
     }
+
+    /// @notice test that will check if the sponsor contract will not validate only SCW contracts that are not deployed by the sponsor contract
+    function test_SponsorContractDoesNotValidateInvalidScwContracts() public {
+        // ── Arrange ──────────────────────────────
+        // Deploy SCW contract outside of the factory
+        SCW invalidScwAddress = new SCW(networkConfig.entryPoint, networkConfig.authorizedSigner, address(scwToken));
+
+        // Build the userOp
+        address dest = address(scwToken);
+        uint256 value = 0;
+
+        bytes memory functionData = abi.encodeWithSelector(scwToken.mint.selector, address(invalidScwAddress), AMOUNT); // mint to invalidScwAddress
+        bytes memory callData = abi.encodeWithSelector(SCW.execute.selector, dest, value, functionData);
+        PackedUserOperation memory userOp = sendPackedUserOp.generateSignedUserOp(
+            address(invalidScwAddress), callData, networkConfig, address(sponsorContract)
+        );
+        bytes32 userOpHash = IEntryPoint(networkConfig.entryPoint).getUserOpHash(userOp);
+
+        // ── Act ──────────────────────────────────
+        // Send the paymaster valdiation call ass the EntryPoint     // ── 1. Generate the unsigned PackedUserOperation data
+        vm.prank(networkConfig.entryPoint);
+        (, uint256 validationData) = sponsorContract.validatePaymasterUserOp(userOp, userOpHash, 0);
+        // ── Assert ──────────────────────────────────
+        assertEq(
+            validationData,
+            1,
+            "Sponsor contract should not validate SCW contracts that are not deployed by the sponsor contract"
+        );
+    }
+
+    /// @notice test that will check if the sponsor contract can validate a SCW contract deployed by the factory
+    function test_SponsorContractCanValidateSCWContractsDeployedByFactory() public {
+        // ── Arrange ──────────────────────────────
+        // Deploy SCW contract outside of the factory
+        vm.prank(networkConfig.authorizedDeployer);
+        address validScwAddress = scwFactory.deployScw(CODE_HASH_USER_1);
+
+        // Build the userOp
+        address dest = address(scwToken);
+        uint256 value = 0;
+
+        bytes memory functionData = abi.encodeWithSelector(scwToken.mint.selector, validScwAddress, AMOUNT);
+        bytes memory callData = abi.encodeWithSelector(SCW.execute.selector, dest, value, functionData);
+        PackedUserOperation memory userOp =
+            sendPackedUserOp.generateSignedUserOp(validScwAddress, callData, networkConfig, address(sponsorContract));
+        bytes32 userOpHash = IEntryPoint(networkConfig.entryPoint).getUserOpHash(userOp);
+
+        // ── Act ──────────────────────────────────
+        // Send the paymaster valdiation call ass the EntryPoint     // ── 1. Generate the unsigned PackedUserOperation data
+        vm.prank(networkConfig.entryPoint);
+        (, uint256 validationData) = sponsorContract.validatePaymasterUserOp(userOp, userOpHash, 0);
+        // ── Assert ──────────────────────────────────
+        assertEq(validationData, 0, "Sponsor contract should validate SCW contracts that are deployed by the factory");
+    }
 }
+
