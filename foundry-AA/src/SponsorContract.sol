@@ -13,14 +13,12 @@ contract SponsorContract is IPaymaster, Ownable {
     error SponsorContract__NoZeroAddress();
     error SponsorContract__NotFromEntryPoint();
     error SponsorContract__NotValidSCW();
-    error SponsorContract__NotAuthorizedSigner(address signer);
 
     /*//////////////////////////////////////////////////////////////
                             State Variables
     //////////////////////////////////////////////////////////////*/
     address private immutable I_SCW_FACTORY;
     address public immutable I_ENTRY_POINT;
-    address public sAuthorizedSigner;
 
     /*//////////////////////////////////////////////////////////////
                                    MODIFIERS
@@ -36,12 +34,11 @@ contract SponsorContract is IPaymaster, Ownable {
                            External functions
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _scwFactory, address _authorizedSigner, address _entryPoint, address _owner) Ownable(_owner) {
-        if (_scwFactory == address(0) || _authorizedSigner == address(0) || _entryPoint == address(0)) {
+    constructor(address _scwFactory, address _entryPoint, address _owner) Ownable(_owner) {
+        if (_scwFactory == address(0) || _entryPoint == address(0)) {
             revert SponsorContract__NoZeroAddress();
         }
         I_SCW_FACTORY = _scwFactory;
-        sAuthorizedSigner = _authorizedSigner;
         I_ENTRY_POINT = _entryPoint;
     }
 
@@ -64,7 +61,6 @@ contract SponsorContract is IPaymaster, Ownable {
         uint256 // maxCost
     )
         external
-        view
         requireFromEntryPoint
         returns (bytes memory context, uint256 validationData)
     {
@@ -79,7 +75,9 @@ contract SponsorContract is IPaymaster, Ownable {
     }
 
     function postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
-        external {}
+        external
+        requireFromEntryPoint
+    {}
 
     /// @notice Deposits ETH into the EntryPoint on behalf of this Paymaster
     ///         to fund gas sponsorship for user transactions.
