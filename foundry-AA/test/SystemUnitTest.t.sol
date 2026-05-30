@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {SCW} from "../src/SCW.sol";
 import {ScwFactory} from "../src/ScwFactory.sol";
 import {ScwToken} from "../src/ScwToken.sol";
@@ -12,6 +12,7 @@ import {SendPackedUserOp} from "../script/SendPackedUserOp.s.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 using MessageHashUtils for bytes32;
@@ -39,6 +40,7 @@ contract SystemUnitTest is Test {
         vm.startPrank(networkConfig.authorizedDeployer);
         (scwFactory, scwToken, sponsorContract) = systemDeployer.deploySystem(networkConfig);
         vm.stopPrank();
+        vm.deal(networkConfig.authorizedDeployer, 10 ether);
     }
 
     function test_DeploySCWOnlyByAuthorizedDeployer() public {
@@ -204,6 +206,102 @@ contract SystemUnitTest is Test {
         (, uint256 validationData) = sponsorContract.validatePaymasterUserOp(userOp, userOpHash, 0);
         // ── Assert ──────────────────────────────────
         assertEq(validationData, 0, "Sponsor contract should validate SCW contracts that are deployed by the factory");
+    }
+
+    /// @notice deployer(or the owner of the sponsor contract) can deposit eth to the sponsor contract
+    /// Fot this test setup the owner of the sponsor contract is the authorized deployer
+    function test_SponsorContractCanDepositEth() public {
+        // ── Arrange ──────────────────────────────
+        uint256 depositAmount = 0.1 ether;
+        console.log("Owner of the Sponsor contract: ", sponsorContract.owner());
+
+        // ── Act ──────────────────────────────────
+        vm.prank(networkConfig.authorizedDeployer); // the owner of the sponsor contract is the authorized deployer
+        sponsorContract.deposit{value: depositAmount}();
+
+        // ── Assert ──────────────────────────────────
+        assertEq(sponsorContract.getDeposit(), depositAmount, "Sponsor contract should have the deposit amount");
+    }
+
+    /// @notice A random user should not be able to deposit ETH into the sponsor contract
+    function test_RandomUserCannotDeposit() public {
+        // ── Arrange ──────────────────────────────
+        uint256 depositAmount = 0.1 ether;
+        vm.deal(randomUser, depositAmount);
+
+        // ── Act & Assert ─────────────────────────
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, randomUser));
+        vm.prank(randomUser);
+        sponsorContract.deposit{value: depositAmount}();
+    }
+
+    /// @notice A random user should not be able to withdraw ETH from the sponsor contract
+    function test_RandomUserCannotWithdraw() public {
+        // ── Arrange ──────────────────────────────
+        uint256 depositAmount = 0.1 ether;
+        vm.prank(networkConfig.authorizedDeployer);
+        sponsorContract.deposit{value: depositAmount}();
+
+        // ── Act & Assert ─────────────────────────
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, randomUser));
+        vm.prank(randomUser);
+        sponsorContract.withdraw(payable(randomUser), depositAmount);
+    }
+
+    /// @notice The owner can withdraw ETH from the sponsor contract's EntryPoint deposit
+    function test_OwnerCanWithdraw() public {
+        // ── Arrange ──────────────────────────────
+        uint256 depositAmount = 0.1 ether;
+        vm.prank(networkConfig.authorizedDeployer);
+        sponsorContract.deposit{value: depositAmount}();
+        assertEq(sponsorContract.getDeposit(), depositAmount);
+
+        address payable recipient = payable(makeAddr("recipient"));
+        uint256 withdrawAmount = 0.05 ether;
+
+        // ── Act ──────────────────────────────────
+        vm.prank(networkConfig.authorizedDeployer);
+        sponsorContract.withdraw(recipient, withdrawAmount);
+
+        // ── Assert ──────────────────────────────────
+        assertEq(sponsorContract.getDeposit(), depositAmount - withdrawAmount);
+        assertEq(recipient.balance, withdrawAmount);
+    }
+
+    /// @notice tests the hole EntyrPoint AA flow with the sponsor contract
+    function test_EntryPointFlowWithSponsorContract() public {
+        // ── Arrange ──────────────────────────────
+        uint256 depositAmount = 0.1 ether;
+        // Deposit ETH to the sponsor contract
+        vm.prank(networkConfig.authorizedDeployer);
+        sponsorContract.deposit{value: depositAmount}();
+        assertEq(sponsorContract.getDeposit(), depositAmount, "Sponsor contract should have the deposit amount");
+        // Deploy a SCW contract using the factory
+        vm.prank(networkConfig.authorizedDeployer);
+        address deployedScwAddress = scwFactory.deployScw(CODE_HASH_USER_1);
+        // Build the userOp
+        address dest = address(scwToken);
+        uint256 value = 0;
+
+        bytes memory functionData = abi.encodeWithSelector(scwToken.mint.selector, deployedScwAddress, AMOUNT);
+        bytes memory callData = abi.encodeWithSelector(SCW.execute.selector, dest, value, functionData);
+        PackedUserOperation memory userOp = sendPackedUserOp.generateSignedUserOp(
+            deployedScwAddress, callData, networkConfig, address(sponsorContract)
+        );
+        // Construct the array of usre ops
+        PackedUserOperation[] memory userOps = new PackedUserOperation[](1);
+        userOps[0] = userOp;
+
+        // random user accting like bundler from the mempool
+        // two-arg prank sets both msg.sender and tx.origin — required by this EntryPoint's nonReentrant modifier
+        vm.prank(randomUser, randomUser);
+        IEntryPoint(networkConfig.entryPoint).handleOps(userOps, payable(randomUser));
+
+        // ── Assert ──────────────────────────────────
+        // Assert that the SCW hasUSDC
+        assertEq(scwToken.balanceOf(address(deployedScwAddress)), AMOUNT, "SCW should have USDC");
+        // Assert that the sponsored contract payed the gas fees
+        assert(sponsorContract.getDeposit() < depositAmount);
     }
 }
 

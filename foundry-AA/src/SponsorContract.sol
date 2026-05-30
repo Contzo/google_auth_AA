@@ -3,8 +3,10 @@ pragma solidity ^0.8.24;
 
 import {IPaymaster, PackedUserOperation} from "account-abstraction/interfaces/IPaymaster.sol";
 import {IScwFactory} from "./interfaces/IScwFactory.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 
-contract SponsorContract is IPaymaster {
+contract SponsorContract is IPaymaster, Ownable {
     /*//////////////////////////////////////////////////////////////
                                  Errors
     //////////////////////////////////////////////////////////////*/
@@ -34,7 +36,7 @@ contract SponsorContract is IPaymaster {
                            External functions
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _scwFactory, address _authorizedSigner, address _entryPoint) {
+    constructor(address _scwFactory, address _authorizedSigner, address _entryPoint, address _owner) Ownable(_owner) {
         if (_scwFactory == address(0) || _authorizedSigner == address(0) || _entryPoint == address(0)) {
             revert SponsorContract__NoZeroAddress();
         }
@@ -79,6 +81,32 @@ contract SponsorContract is IPaymaster {
     function postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas)
         external {}
 
+    /// @notice Deposits ETH into the EntryPoint on behalf of this Paymaster
+    ///         to fund gas sponsorship for user transactions.
+    /// @dev Only the owner can deposit. The ETH is held by the EntryPoint and
+    ///      drawn down each time this Paymaster sponsors a UserOperation.
+    ///      The EntryPoint's depositTo is payable — the ETH sent with this call
+    ///      is credited to this Paymaster's deposit balance.
+    function deposit() external payable onlyOwner {
+        IEntryPoint(I_ENTRY_POINT).depositTo{value: msg.value}(address(this));
+    }
+
+    /// @notice Withdraws ETH from this Paymaster's deposit in the EntryPoint.
+    /// @dev Only the owner can withdraw. The EntryPoint sends ETH directly
+    ///      to the recipient — it never passes through this contract.
+    /// @param recipient The address to receive the withdrawn ETH.
+    /// @param amount    The amount of ETH to withdraw in wei.
+    function withdraw(address payable recipient, uint256 amount) external onlyOwner {
+        if (recipient == address(0)) revert SponsorContract__NoZeroAddress();
+        IEntryPoint(I_ENTRY_POINT).withdrawTo(recipient, amount);
+    }
+
+    /// @notice Returns the current ETH deposit balance of this Paymaster in the EntryPoint.
+    /// @dev The EntryPoint deducts from this balance each time a sponsored UserOp executes.
+    ///      Monitor this value and top up via deposit() before it reaches zero.
+    function getDeposit() external view returns (uint256) {
+        return IEntryPoint(I_ENTRY_POINT).balanceOf(address(this));
+    }
     /*//////////////////////////////////////////////////////////////
                            Internal functions
     //////////////////////////////////////////////////////////////*/
