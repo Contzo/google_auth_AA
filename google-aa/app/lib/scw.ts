@@ -87,3 +87,14 @@ export async function deployScw(
     return null;
   }
 }
+
+export async function anticipateScw(
+  googleSubId: string,
+): Promise<`0x${string}` | null> {
+  try {
+    const credentialHash = computeCredentialHash(googleSubId);
+  } catch (error) {
+    console.error("[anticipateScw] Contract write failed:", error);
+    return null;
+  }
+}
