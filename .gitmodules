@@ -7,3 +7,6 @@
 [submodule "foundry-AA/lib/account-abstraction"]
 	path = foundry-AA/lib/account-abstraction
 	url = https://github.com/eth-infinitism/account-abstraction
+[submodule "foundry-AA/lib/foundry-devops"]
+	path = foundry-AA/lib/foundry-devops
+	url = https://github.com/Cyfrin/foundry-devops

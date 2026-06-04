@@ -4,8 +4,11 @@ DEPLOY_SCRIPT := script/SystemDeployer.s.sol:SystemDeployer
 MINT_SCRIPT  := script/MintScwToken.s.sol:MintScwToken
 
 AMOUNT ?= 1000000000000000000
+CREDENTIAL_HASH ?= 0x0000000000000000000000000000000000000000000000000000000000000000
 
-.PHONY: anvil deploy-anvil deploy-sepolia mint-anvil mint-sepolia
+DEPLOY_SCW_SCRIPT := script/DeployScw.s.sol:DeployScw
+
+.PHONY: anvil deploy-anvil deploy-sepolia mint-anvil mint-sepolia deploy-scw-anvil
 
 anvil:
 	anvil --code-size-limit 40000
@@ -23,6 +26,13 @@ deploy-sepolia:
 		--broadcast \
 		--verify \
 		--etherscan-api-key $(ETHERSCAN_API_KEY)
+
+deploy-scw-anvil:
+	forge script $(DEPLOY_SCW_SCRIPT) \
+		--sig "run(bytes32)" $(CREDENTIAL_HASH) \
+		--rpc-url http://127.0.0.1:8545 \
+		--private-key $(LOCAL_SIGNER_KEY) \
+		--broadcast
 
 mint-anvil:
 	TOKEN_ADDRESS=$(ANVIL_ERC20_TOKEN) AMOUNT=$(AMOUNT) \
