@@ -7,8 +7,9 @@ AMOUNT ?= 1000000000000000000
 CREDENTIAL_HASH ?= 0x0000000000000000000000000000000000000000000000000000000000000000
 
 DEPLOY_SCW_SCRIPT := script/DeployScw.s.sol:DeployScw
+FUND_SPONSOR_SCRIPT := script/FundSponsor.s.sol:FundSponsor
 
-.PHONY: anvil deploy-anvil deploy-sepolia mint-anvil mint-sepolia deploy-scw-anvil
+.PHONY: anvil deploy-anvil deploy-sepolia mint-anvil mint-sepolia deploy-scw-anvil fund-sponsor-sepolia
 
 anvil:
 	anvil --code-size-limit 40000
@@ -46,4 +47,10 @@ mint-sepolia:
 	forge script $(MINT_SCRIPT) \
 		--rpc-url $(SEPOLIA_RPC_URL) \
 		--private-key $(SEPOLIA_SIGNER_KEY) \
+		--broadcast
+
+fund-sponsor-sepolia:
+	forge script $(FUND_SPONSOR_SCRIPT) \
+		--rpc-url $(SEPOLIA_RPC_URL) \
+		--account eth_dev \
 		--broadcast
