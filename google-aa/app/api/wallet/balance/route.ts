@@ -3,6 +3,8 @@
 import { NextResponse, NextRequest } from "next/server";
 import { Scw } from "../../../lib/scw";
 import { env } from "../../../lib/env";
+import { entryContract } from "../../../lib/viemClient";
+import { Address, isAddress } from "viem";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -15,15 +17,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!/^0x[0-9a-fA-F]{40}$/.test(scwAddress)) {
-    return NextResponse.json({ error: "Invalid address." }, { status: 400 });
+  if (!isAddress(scwAddress)) {
+    return NextResponse.json({ error: "Invalid scwAddress." }, { status: 400 });
   }
-
   try {
     const scw = new Scw(scwAddress as `0x${string}`);
     console.log(`[GET /api/wallet/balance] Fetching balance for ${scwAddress}`);
     console.log("ERC20 token address:", env("erc20Token"));
     const balance = await scw.getBalance(env("erc20Token") as `0x${string}`);
+    const nonce = await entryContract.getNonce(scwAddress as Address);
+    console.log(`[GET /api/wallet/balance] Nonce: ${nonce}`);
     return NextResponse.json({ balance: balance.toString() });
   } catch (e) {
     console.error("[GET /api/wallet/balance] Error:", e);

@@ -1,37 +1,14 @@
 // app/lib/scwFactory.ts
-import {
-  keccak256,
-  concat,
-  toBytes,
-  createWalletClient,
-  publicActions,
-  http,
-  type WalletClient,
-  type PublicActions,
-  type Account,
-  type Chain,
-  type Transport,
-} from "viem";
-import { sepolia, anvil } from "viem/chains";
+import { keccak256, concat, toBytes } from "viem";
 import { ScwFactoryAbi } from "./abi/ScwFactory";
-import { env, rawEnv, NETWORK } from "./env";
-import { privateKeyToAccount } from "viem/accounts";
-
-type ExtendedWalletClient = WalletClient<Transport, Chain, Account> &
-  PublicActions;
+import { rawEnv } from "./env";
+import { walletClient } from "./viemClient";
 
 export class ScwFactory {
-  private client: ExtendedWalletClient;
   private factoryAddress: `0x${string}`;
 
   constructor(factoryAddress: `0x${string}`) {
     this.factoryAddress = factoryAddress;
-    const account = privateKeyToAccount(env("signerKey") as `0x${string}`);
-    this.client = createWalletClient({
-      account,
-      chain: NETWORK === "anvil" ? anvil : sepolia,
-      transport: http(env("rpcUrl")),
-    }).extend(publicActions) as ExtendedWalletClient;
   }
 
   /// Computes the credentialHash from the user's Google sub ID and the server secret.
@@ -52,13 +29,13 @@ export class ScwFactory {
   async deployScw(googleSubId: string): Promise<`0x${string}` | null> {
     try {
       const credentialHash = this.computeCredentialHash(googleSubId);
-      const { request } = await this.client.simulateContract({
+      const { request } = await walletClient.simulateContract({
         address: this.factoryAddress,
         abi: ScwFactoryAbi,
         functionName: "deployScw",
         args: [credentialHash],
       });
-      const scwAddress = await this.client.writeContract(request);
+      const scwAddress = await walletClient.writeContract(request);
       return scwAddress as `0x${string}`;
     } catch (error) {
       console.error("[deployScw] Contract write failed:", error);
@@ -73,7 +50,7 @@ export class ScwFactory {
   async predictScwAddress(googleSubId: string): Promise<`0x${string}` | null> {
     try {
       const credentialHash = this.computeCredentialHash(googleSubId);
-      const scwAddress = await this.client.readContract({
+      const scwAddress = await walletClient.readContract({
         address: this.factoryAddress,
         abi: ScwFactoryAbi,
         functionName: "predictScwAddress",
@@ -91,7 +68,7 @@ export class ScwFactory {
   ): Promise<`0x${string}` | null> {
     try {
       const credentialHash = this.computeCredentialHash(googleSubId);
-      const scwAddress = await this.client.readContract({
+      const scwAddress = await walletClient.readContract({
         address: this.factoryAddress,
         abi: ScwFactoryAbi,
         functionName: "getScwAddress",

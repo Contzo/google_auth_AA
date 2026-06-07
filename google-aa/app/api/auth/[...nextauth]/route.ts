@@ -1,10 +1,8 @@
 // app/api/auth/[...nextauth]/route.ts
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { rawEnv, env } from "../../../lib/env";
-import { ScwFactory } from "../../../lib/scwFactory";
-
-const scwFactory = new ScwFactory(env("scwFactory") as `0x${string}`);
+import { rawEnv } from "../../../lib/env";
+import { scwFactory } from "../../../lib/viemClient";
 
 /*//////////////////////////////////////////////////////////////
                        AUTH OPTIONS
