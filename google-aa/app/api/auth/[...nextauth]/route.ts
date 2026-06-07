@@ -1,8 +1,10 @@
 // app/api/auth/[...nextauth]/route.ts
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { rawEnv } from "../../../lib/env";
-import { computeCredentialHash, getScwAddressFromChain } from "../../../lib/scw";
+import { rawEnv, env } from "../../../lib/env";
+import { ScwFactory } from "../../../lib/scwFactory";
+
+const scwFactory = new ScwFactory(env("scwFactory") as `0x${string}`);
 
 /*//////////////////////////////////////////////////////////////
                        AUTH OPTIONS
@@ -51,29 +53,12 @@ export const authOptions: NextAuthOptions = {
       // On subsequent requests profile is undefined — the token already
       // contains everything stored from the first login.
       if (profile) {
-        // profile.sub is Google's permanent unique user identifier.
-        // It never changes even if the user changes their email address.
         token.subId = profile.sub as string;
 
-        // Check if this returning user already has a deployed SCW.
-        // New users will get null here.
-        token.scwAddress = await getScwAddressFromChain(profile.sub as string);
-        console.log("Credential hash:", computeCredentialHash(profile.sub as string));
-      }
-
-      // ── Subsequent requests ──────────────────────────────────────
-      // Handles the gap between first login and SCW deployment:
-      //   1. User logs in            → scwAddress = null (no SCW yet)
-      //   2. /api/wallet/deploy runs → SCW deployed on-chain
-      //   3. User refreshes page     → jwt() runs, profile is undefined
-      //   4. This check finds the new SCW address
-      //   5. Cookie updated — frontend now shows wallet address
-      //
-      // Once scwAddress is set this block is skipped entirely
-      // so no unnecessary blockchain calls are made.
-      if (token.subId && !token.scwAddress) {
-        token.scwAddress = await getScwAddressFromChain(token.subId);
-        console.log("Credential hash:", computeCredentialHash(token.subId));
+        const scwAddress = await scwFactory.predictScwAddress(
+          profile.sub as string,
+        );
+        token.scwAddress = scwAddress;
       }
 
       return token;
