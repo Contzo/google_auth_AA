@@ -156,6 +156,7 @@ export async function waitForUserOperation(
 ): Promise<{ txHash: `0x${string}`; success: boolean }> {
   const receipt = await bundlerClient.waitForUserOperationReceipt({
     hash: userOpHash,
+    timeout: 300_000, // 5 min — Sepolia can be slow under load
   });
   return {
     txHash: receipt.receipt.transactionHash,

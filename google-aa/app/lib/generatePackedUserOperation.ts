@@ -113,11 +113,11 @@ export async function generateSignedUserOperation(
 
     // Pass 2 — estimate gas using the signed draft.
     const gas = await estimateUserOperationGas(draftUserOp);
-    // Alchemy's estimator adds a ~4x buffer to verificationGasLimit, but its bundler
-    // rejects UserOps where actualGasUsed/limit < 0.4. Scaling by 0.5 keeps the limit
-    // within 2.5x of actual usage (efficiency ≈ 0.46), safely above the threshold.
-    const verificationGasLimit = gas.verificationGasLimit / BigInt(2);
-    const paymasterVerificationGasLimit = gas.paymasterVerificationGasLimit / BigInt(2);
+    // Alchemy's estimator adds a ~6x buffer to verificationGasLimit, but its bundler
+    // rejects UserOps where actualGasUsed/limit < 0.4. Dividing by 3 targets ~0.48
+    // efficiency (actual ≈ 16% of estimate → limit = estimate/3 → efficiency ≈ 0.49).
+    const verificationGasLimit = gas.verificationGasLimit / BigInt(3);
+    const paymasterVerificationGasLimit = gas.paymasterVerificationGasLimit / BigInt(3);
     draftUserOp.accountGasLimits = packGas(verificationGasLimit, gas.callGasLimit);
     draftUserOp.preVerificationGas = gas.preVerificationGas;
     draftUserOp.gasFees = packGas(gas.maxPriorityFeePerGas, gas.maxFeePerGas);
@@ -171,12 +171,13 @@ export async function generateMintUserOperation(
 }
 export async function generateTransferUserOperation(
   tokenAddress: Address,
+  senderScwAddress: Address,
   recipient: Address,
   amount: bigint,
   paymaster: Address,
 ): Promise<PackedUserOperation | null> {
   try {
-    const mintCallData = encodeFunctionData({
+    const transferCallData = encodeFunctionData({
       abi: ScwTokenAbi,
       functionName: "transfer",
       args: [recipient, amount],
@@ -184,10 +185,10 @@ export async function generateTransferUserOperation(
     const executeCallData = encodeFunctionData({
       abi: ScwAbi,
       functionName: "execute",
-      args: [tokenAddress, BigInt(0), mintCallData],
+      args: [tokenAddress, BigInt(0), transferCallData],
     });
     return await generateSignedUserOperation(
-      recipient,
+      senderScwAddress,
       executeCallData,
       paymaster,
     );
