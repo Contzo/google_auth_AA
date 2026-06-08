@@ -1,5 +1,5 @@
 // app/lib/scwFactory.ts
-import { keccak256, concat, toBytes } from "viem";
+import { keccak256, concat, toBytes, decodeEventLog } from "viem";
 import { ScwFactoryAbi } from "./abi/ScwFactory";
 import { rawEnv } from "./env";
 import { walletClient } from "./viemClient";
@@ -35,8 +35,19 @@ export class ScwFactory {
         functionName: "deployScw",
         args: [credentialHash],
       });
-      const scwAddress = await walletClient.writeContract(request);
-      return scwAddress as `0x${string}`;
+      const txHash = await walletClient.writeContract(request);
+      const receipt = await walletClient.waitForTransactionReceipt({ hash: txHash });
+      const deployLog = receipt.logs.find(
+        (log) => log.address.toLowerCase() === this.factoryAddress.toLowerCase(),
+      );
+      if (!deployLog) return null;
+      const { args } = decodeEventLog({
+        abi: ScwFactoryAbi,
+        eventName: "SCWDeployed",
+        data: deployLog.data,
+        topics: deployLog.topics,
+      });
+      return (args as { scwAddress: `0x${string}` }).scwAddress;
     } catch (error) {
       console.error("[deployScw] Contract write failed:", error);
       return null;

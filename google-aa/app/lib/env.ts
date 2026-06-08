@@ -11,7 +11,7 @@ const KEYS: Record<string, Record<Network, string>> = {
   entryPoint: { anvil: "ANVIL_ENTRY_POINT", sepolia: "SEPOLIA_ENTRY_POINT" },
   scwFactory: { anvil: "ANVIL_SCW_FACTORY", sepolia: "SEPOLIA_FACTORY" },
   erc20Token: { anvil: "ANVIL_ERC20_TOKEN", sepolia: "SEPOLIA_ERC20_TOKEN" },
-  sponsorContract: { anvil: "ANVIL_SPONSOR_CONTRACT", sepolia: "" },
+  sponsorContract: { anvil: "ANVIL_SPONSOR_CONTRACT", sepolia: "SEPOLIA_SPONSOR_CONTRACT" },
   signerKey: { anvil: "LOCAL_SIGNER_KEY", sepolia: "SEPOLIA_SIGNER_KEY" },
 };
 

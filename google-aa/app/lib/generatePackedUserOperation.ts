@@ -7,6 +7,7 @@ import {
   zeroAddress,
 } from "viem";
 import { walletClient, entryContract } from "./viemClient";
+import { estimateUserOperationGas } from "./bundlerClient";
 import { ScwAbi } from "./abi/Scw";
 import { ScwTokenAbi } from "./abi/ScwToken";
 
@@ -42,8 +43,11 @@ function encodePaymasterAndData(
 function generatePackedUserOperation(
   sender: Address,
   nonce: bigint,
+  initCode: `0x${string}`,
   callData: `0x${string}`,
   paymaster: Address,
+  maxFeePerGas: bigint,
+  maxPriorityFeePerGas: bigint,
 ): PackedUserOperation {
   if (!isAddress(sender)) {
     throw new Error("Invalid sender address");
@@ -52,15 +56,13 @@ function generatePackedUserOperation(
     throw new Error("Invalid paymasterAndData address");
   }
 
-  const verificationGasLimit = BigInt(16777216);
-  const callGasLimit = verificationGasLimit;
-  const maxPriorityFeePerGas = BigInt(256);
-  const maxFeePerGas = maxPriorityFeePerGas;
+  const verificationGasLimit = BigInt(150_000);
+  const callGasLimit = BigInt(100_000);
   const accountGasLimits = packGas(verificationGasLimit, callGasLimit);
-  const gasFees = packGas(maxFeePerGas, maxPriorityFeePerGas);
+  const gasFees = packGas(maxPriorityFeePerGas, maxFeePerGas);
 
-  const paymsterVerificationGasLimit = verificationGasLimit;
-  const paymasterPostOpGasLimit = verificationGasLimit;
+  const paymsterVerificationGasLimit = BigInt(100_000);
+  const paymasterPostOpGasLimit = BigInt(50_000);
   const paymasterAndData = encodePaymasterAndData(
     paymaster,
     paymsterVerificationGasLimit,
@@ -70,10 +72,10 @@ function generatePackedUserOperation(
   return {
     sender,
     nonce,
-    initCode: `0x`,
+    initCode,
     callData,
     accountGasLimits,
-    preVerificationGas: BigInt(0),
+    preVerificationGas: BigInt(50_000),
     gasFees,
     paymasterAndData,
     signature: `0x`,
@@ -84,28 +86,56 @@ export async function generateSignedUserOperation(
   sender: Address,
   callData: `0x${string}`,
   paymasterAndData: `0x${string}`,
+  initCode: `0x${string}` = `0x`,
 ): Promise<PackedUserOperation | null> {
   try {
     const nonce = await entryContract.getNonce(sender);
     if (nonce === null) {
       throw new Error("Failed to fetch nonce");
     }
-    const userOp = generatePackedUserOperation(
+
+    // Pass 1 — sign the draft (gas = 0) so ECDSA.recover doesn't revert during estimation.
+    // A dummy 0xff...ff signature causes OpenZeppelin's ECDSA to throw ECDSAInvalidSignatureS
+    // (s > secp256k1 half-order), which bubbles up as AA23. A real signature for the
+    // draft hash is valid ECDSA, recovers to sUserOperationSigner, and lets estimation proceed.
+    const draftUserOp = generatePackedUserOperation(
       sender,
       nonce,
+      initCode,
       callData,
       paymasterAndData,
+      BigInt(0),
+      BigInt(0),
     );
-    const userOpHash = await entryContract.getUserOpHash(userOp);
-    if (!userOpHash) {
-      throw new Error("Failed to fetch userOpHash");
+    const draftHash = await entryContract.getUserOpHash(draftUserOp);
+    if (!draftHash) throw new Error("Failed to fetch draft userOpHash");
+    draftUserOp.signature = await walletClient.signMessage({ message: { raw: draftHash as Hex } });
+
+    // Pass 2 — estimate gas using the signed draft.
+    const gas = await estimateUserOperationGas(draftUserOp);
+    // Alchemy's estimator adds a ~4x buffer to verificationGasLimit, but its bundler
+    // rejects UserOps where actualGasUsed/limit < 0.4. Scaling by 0.5 keeps the limit
+    // within 2.5x of actual usage (efficiency ≈ 0.46), safely above the threshold.
+    const verificationGasLimit = gas.verificationGasLimit / BigInt(2);
+    const paymasterVerificationGasLimit = gas.paymasterVerificationGasLimit / BigInt(2);
+    draftUserOp.accountGasLimits = packGas(verificationGasLimit, gas.callGasLimit);
+    draftUserOp.preVerificationGas = gas.preVerificationGas;
+    draftUserOp.gasFees = packGas(gas.maxPriorityFeePerGas, gas.maxFeePerGas);
+    if (draftUserOp.paymasterAndData !== "0x") {
+      const pmHex = (draftUserOp.paymasterAndData as string).slice(2);
+      const paymaster = `0x${pmHex.slice(0, 40)}` as Address;
+      draftUserOp.paymasterAndData = encodePaymasterAndData(
+        paymaster,
+        paymasterVerificationGasLimit,
+        gas.paymasterPostOpGasLimit,
+      );
     }
-    // Pack the userOpHash into the signature
-    const signature = await walletClient.signMessage({
-      message: { raw: userOpHash as Hex },
-    });
-    userOp.signature = signature;
-    return userOp;
+
+    // Gas fields changed the hash — sign once more with the final values.
+    const finalHash = await entryContract.getUserOpHash(draftUserOp);
+    if (!finalHash) throw new Error("Failed to fetch final userOpHash");
+    draftUserOp.signature = await walletClient.signMessage({ message: { raw: finalHash as Hex } });
+    return draftUserOp;
   } catch (e) {
     console.error("[generateSignedUserOperation] Error:", e);
     return null;
@@ -114,7 +144,7 @@ export async function generateSignedUserOperation(
 
 export async function generateMintUserOperation(
   tokenAddress: Address,
-  recipient: Address,
+  scwAddress: Address,
   amount: bigint,
   paymaster: Address,
 ): Promise<PackedUserOperation | null> {
@@ -122,7 +152,7 @@ export async function generateMintUserOperation(
     const mintCallData = encodeFunctionData({
       abi: ScwTokenAbi,
       functionName: "mint",
-      args: [recipient, amount],
+      args: [scwAddress, amount],
     });
     const executeCallData = encodeFunctionData({
       abi: ScwAbi,
@@ -130,7 +160,7 @@ export async function generateMintUserOperation(
       args: [tokenAddress, BigInt(0), mintCallData],
     });
     return await generateSignedUserOperation(
-      recipient,
+      scwAddress,
       executeCallData,
       paymaster,
     );
