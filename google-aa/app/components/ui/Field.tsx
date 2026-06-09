@@ -34,7 +34,7 @@ export function Field({
       <div className="group flex items-center gap-2 rounded-xl border border-line bg-sunken px-3.5 transition-colors focus-within:border-accentdim focus-within:bg-base">
         <input
           className={
-            "h-[50px] w-full bg-transparent text-[15px] text-ink outline-none placeholder:text-dim " +
+            "h-12.5 w-full bg-transparent text-[15px] text-ink outline-none placeholder:text-dim " +
             (mono ? "font-mono num " : "") +
             className
           }
@@ -42,7 +42,9 @@ export function Field({
         />
         {trailing}
         {suffix && (
-          <span className="shrink-0 font-mono text-[13px] font-medium text-muted">{suffix}</span>
+          <span className="shrink-0 font-mono text-[13px] font-medium text-muted">
+            {suffix}
+          </span>
         )}
       </div>
     </label>

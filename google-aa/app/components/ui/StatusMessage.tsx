@@ -24,9 +24,9 @@ export function StatusMessage({ kind, children }: StatusMessageProps) {
   }[kind];
 
   return (
-    <div className={`mt-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] ${styles.box}`}>
-      {styles.icon}
-      <span>{children}</span>
+    <div className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12.5px] ${styles.box}`}>
+      <span className="mt-0.5 shrink-0">{styles.icon}</span>
+      <span className="break-all">{children}</span>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export default async function DashboardPage() {
               balanceWei={balance}
               address={session!.user.scwAddress as string}
             />
-            <DashboardActions />
+            <DashboardActions balanceWei={balance} />
           </div>
         </div>
       </div>

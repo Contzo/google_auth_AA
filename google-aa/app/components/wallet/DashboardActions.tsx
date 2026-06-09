@@ -1,11 +1,15 @@
 import MintCard from "./MintCard";
 import TransferCard from "./TransferCard";
 
-export default function DashboardActions() {
+interface DashboardActionsProps {
+  balanceWei: string;
+}
+
+export default function DashboardActions({ balanceWei }: DashboardActionsProps) {
   return (
     <div className="space-y-4">
       <MintCard />
-      <TransferCard />
+      <TransferCard balanceWei={balanceWei} />
     </div>
   );
 }

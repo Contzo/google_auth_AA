@@ -1,6 +1,7 @@
 
 import type { Metadata } from "next";
 import { Hanken_Grotesk, Instrument_Serif, IBM_Plex_Mono } from "next/font/google";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import "./globals.css";
 
 /* Fonts loaded once, exposed as CSS variables consumed by @theme. */
@@ -37,7 +38,9 @@ export default function RootLayout({
     <html
       lang="en"
     >
-      <body className={`${hanken.className} ${instrument.className} ${plexMono.className}`}>{children}</body>
+      <body className={`${hanken.className} ${instrument.className} ${plexMono.className}`}>
+        <QueryProvider>{children}</QueryProvider>
+      </body>
     </html>
   );
 }
