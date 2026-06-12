@@ -1,6 +1,7 @@
 "use client";
 
-import { CopyIcon } from "@/components/icons";
+import { useState } from "react";
+import { CopyIcon, CheckIcon } from "@/components/icons";
 
 /* ============================================================
    AddressChip — copyable monospace address pill.
@@ -15,8 +16,12 @@ interface AddressChipProps {
 }
 
 export function AddressChip({ label, value }: AddressChipProps) {
-  function handleCopy() {
-    // TODO: navigator.clipboard.writeText(value ?? label) + toast
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(value ?? label);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -25,7 +30,11 @@ export function AddressChip({ label, value }: AddressChipProps) {
       className="group inline-flex items-center gap-1.5 rounded-md border border-line bg-sunken px-2 py-1 font-mono text-[11.5px] text-muted transition-colors hover:text-ink"
     >
       {label}
-      <CopyIcon size={12} className="text-dim transition-colors group-hover:text-accent" />
+      {copied ? (
+        <CheckIcon size={12} className="text-accent" />
+      ) : (
+        <CopyIcon size={12} className="text-dim transition-colors group-hover:text-accent" />
+      )}
     </button>
   );
 }
